@@ -22,6 +22,8 @@ type Store = {
   setChats: (chats: Chat[]) => void;
   addMessage: (message: Message) => void;
   setMessages: (messages: Message[]) => void;
+  removeChat: (chatId: number) => void;
+  removeMessage: (messageId: number) => void;
 };
 
 const useStore = create<Store>((set) => ({
@@ -33,6 +35,15 @@ const useStore = create<Store>((set) => ({
       messages: [...state.messages.filter((m) => m.id !== message.id), message],
     })),
   setMessages: (messages) => set({ messages }),
+  removeChat: (chatId) =>
+    set((state) => ({
+      chats: state.chats.filter((chat) => chat.id !== chatId),
+      messages: state.messages.filter((msg) => msg.chatId !== chatId),
+    })),
+  removeMessage: (messageId) =>
+    set((state) => ({
+      messages: state.messages.filter((msg) => msg.id !== messageId),
+    })),
 }));
 
 export default useStore;

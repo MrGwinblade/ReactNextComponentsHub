@@ -4,31 +4,54 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import useStore from '@/lib/useStore';
 import { cn } from '@/shared/lib/utils';
+import {
+  useFloating,
+  autoUpdate,
+  offset,
+  flip,
+  shift,
+  useClick,
+  useDismiss,
+  useRole,
+  useInteractions,
+  FloatingPortal,
+} from '@floating-ui/react';
+import { Trash2 } from 'lucide-react';
 
 interface ChatListProps {
   selectedChat: number | null;
   onSelectChat: (chatId: number) => void;
-  className?: string
+  className?: string;
 }
 
 export const ChatList: React.FC<ChatListProps> = ({ selectedChat, onSelectChat, className }) => {
   const { data: session } = useSession();
-  const { chats, setChats } = useStore();
+  const { chats, messages, setChats, removeChat } = useStore();
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [openDeleteId, setOpenDeleteId] = useState<number | null>(null);
+
+  const { refs, floatingStyles, context } = useFloating({
+    open: !!openDeleteId,
+    onOpenChange: (open) => setOpenDeleteId(open ? openDeleteId : null),
+    placement: 'right',
+    middleware: [offset(10), flip(), shift()],
+    whileElementsMounted: autoUpdate,
+  });
+
+  const click = useClick(context);
+  const dismiss = useDismiss(context);
+  const role = useRole(context);
+
+  const { getReferenceProps, getFloatingProps } = useInteractions([click, dismiss, role]);
 
   const fetchChats = async () => {
     try {
       const res = await fetch('/api/chats');
       if (!res.ok) throw new Error('Failed to fetch chats');
       const data = await res.json();
-      console.log('Fetched chats:', data);
-      if (Array.isArray(data)) {
-        setChats(data);
-      } else {
-        console.error('Chats data is not an array:', data);
-        setChats([]);
-      }
+      if (Array.isArray(data)) setChats(data);
+      else setChats([]);
     } catch (error) {
       console.error('Error fetching chats:', error);
       setChats([]);
@@ -52,9 +75,7 @@ export const ChatList: React.FC<ChatListProps> = ({ selectedChat, onSelectChat, 
 
   const selectOrCreateChat = async (userId: number) => {
     const existingChat = chats.find((chat) =>
-      chat.participants.some(
-        (p) => p.userId === userId && chat.type === 'DIRECT'
-      )
+      chat.participants.some((p) => p.userId === userId && chat.type === 'DIRECT')
     );
 
     if (existingChat) {
@@ -78,10 +99,27 @@ export const ChatList: React.FC<ChatListProps> = ({ selectedChat, onSelectChat, 
     setSearchResults([]);
   };
 
-  useEffect(() => {
-    if (session?.user?.id) {
-      fetchChats();
+  const handleDeleteChat = async (chatId: number) => {
+    try {
+      const res = await fetch(`/api/chats?chatId=${chatId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Failed to delete chat');
+      removeChat(chatId);
+      if (selectedChat === chatId) onSelectChat(0);
+    } catch (error) {
+      console.error('Error deleting chat:', error);
     }
+    setOpenDeleteId(null);
+  };
+
+  const getLastMessage = (chatId: number) => {
+    const chatMessages = messages.filter((msg) => msg.chatId === chatId);
+    return chatMessages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+  };
+
+  useEffect(() => {
+    if (session?.user?.id) fetchChats();
   }, [session?.user?.id]);
 
   useEffect(() => {
@@ -91,8 +129,8 @@ export const ChatList: React.FC<ChatListProps> = ({ selectedChat, onSelectChat, 
   if (!session) return <div>Loading...</div>;
 
   return (
-    <div className={cn("",className)}>
-      <div className="p-4 border-b border-zinc-600">
+    <div className={cn('', className)}>
+      <div id="SEARCH" className="p-4 border-b border-zinc-600">
         <input
           type="text"
           value={search}
@@ -114,28 +152,62 @@ export const ChatList: React.FC<ChatListProps> = ({ selectedChat, onSelectChat, 
           </div>
         )}
       </div>
-      <div className="flex-1 overflow-y-auto text-slate-200">
+      <div id="CHATUSERS" className="flex-1 overflow-y-auto text-slate-200">
         {Array.isArray(chats) && chats.length > 0 ? (
-          chats.map((chat) => (
-            <div
-              key={chat.id}
-              onClick={() => onSelectChat(chat.id)}
-              className={`p-4 hover:bg-slate-700/40 cursor-pointer flex items-center ${
-                selectedChat === chat.id ? 'bg-[#151e29]' : ''
-              }`}
-            >
-              <p className="font-medium">
-                {chat.name ||
-                  chat.participants.find((p) => p.userId !== session.user.id)
-                    ?.user.fullName ||
-                  'Unknown User'}
-              </p>
-            </div>
-          ))
+          chats.map((chat) => {
+            const lastMessage = getLastMessage(chat.id);
+            return (
+              <div
+                key={chat.id}
+                className={`p-4 hover:bg-slate-700/40 cursor-pointer flex items-center justify-between ${
+                  selectedChat === chat.id ? 'bg-[#151e29]' : ''
+                }`}
+              >
+                <div className="flex-1" onClick={() => onSelectChat(chat.id)}>
+                  <p className="font-medium">
+                    {chat.name ||
+                      chat.participants.find((p) => p.userId !== session.user.id)?.user.fullName ||
+                      'Unknown User'}
+                  </p>
+                  {lastMessage && (
+                    <div className="text-sm text-gray-400 truncate">
+                      <span>{lastMessage.content}</span> ·{' '}
+                      <span>{new Date(lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                  )}
+                </div>
+                <div
+                  ref={refs.setReference}
+                  {...getReferenceProps()}
+                  onClick={() => setOpenDeleteId(chat.id)}
+                  className="p-1"
+                >
+                  <Trash2 className="h-5 w-5 text-red-400 hover:text-red-600" />
+                </div>
+                {openDeleteId === chat.id && (
+                  <FloatingPortal>
+                    <div
+                      ref={refs.setFloating}
+                      style={floatingStyles}
+                      {...getFloatingProps()}
+                      className="bg-white p-2 rounded shadow-lg z-10"
+                    >
+                      <button
+                        onClick={() => handleDeleteChat(chat.id)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        Delete Chat
+                      </button>
+                    </div>
+                  </FloatingPortal>
+                )}
+              </div>
+            );
+          })
         ) : (
           <div className="p-4 text-slate-200">No chats available</div>
         )}
       </div>
     </div>
   );
-}
+};

@@ -1,13 +1,11 @@
-
 import { NextResponse } from 'next/server';
-import { useSession } from 'next-auth/react';
-import { prisma } from '@@/prisma/prisma-client'; 
-import { notifyNewMessage } from '../../../lib/notify';
+import { prisma } from '@@/prisma/prisma-client';
+import { notifyNewMessage, notifyMessageDeleted } from '../../../lib/notify'; // Обновленный импорт
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/constants/auth-constants';
 
 export async function GET(req: Request) {
-    const session = await getServerSession(authOptions);
+  const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -29,7 +27,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-    const session = await getServerSession(authOptions);
+  const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -58,4 +56,29 @@ export async function POST(req: Request) {
   });
 
   return NextResponse.json(message);
+}
+
+export async function DELETE(req: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const messageId = searchParams.get('messageId');
+
+  if (!messageId) {
+    return NextResponse.json({ error: 'Message ID required' }, { status: 400 });
+  }
+
+  const message = await prisma.message.delete({
+    where: { id: Number(messageId) },
+  });
+
+  await notifyMessageDeleted({
+    chatId: message.chatId,
+    messageId: message.id,
+  });
+
+  return NextResponse.json({ success: true });
 }

@@ -4,17 +4,25 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import useStore from '@/lib/useStore';
 import { cn } from '@/shared/lib/utils';
-import { Button, Input } from '@/components/ui';
+import { Input } from '@/components/ui';
 import { Send } from 'lucide-react';
+import { notifyMessageDeleted } from '@/lib/notify';
+import { MessageItem } from './message';
+
+
 
 interface ChatWindowProps {
   selectedChat: number | null;
   className?: string;
 }
 
+
+
+
+
 export const ChatWindow: React.FC<ChatWindowProps> = ({ selectedChat, className }) => {
   const { data: session } = useSession();
-  const { chats, messages, setMessages } = useStore();
+  const { chats, messages, setMessages, removeMessage } = useStore();
   const [message, setMessage] = useState('');
 
   const fetchMessages = async (chatId: number) => {
@@ -52,66 +60,70 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ selectedChat, className 
     }
   };
 
-  useEffect(() => {
-    if (selectedChat) {
-      fetchMessages(selectedChat);
+  const handleDeleteMessage = async (messageId: number) => {
+    try {
+      const res = await fetch(`/api/messages?messageId=${messageId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Failed to delete message');
+      const message = messages.find((msg) => msg.id === messageId);
+      if (message) {
+        await notifyMessageDeleted({
+          chatId: message.chatId,
+          messageId: message.id,
+        });
+      }
+      removeMessage(messageId);
+    } catch (error) {
+      console.error('Error deleting message:', error);
     }
+  };
+
+  useEffect(() => {
+    if (selectedChat) fetchMessages(selectedChat);
   }, [selectedChat]);
 
   if (!session) return null;
 
   return (
-    <div className={cn("flex flex-col", className)}>
+    <div className={cn('flex flex-col', className)}>
       {selectedChat ? (
         <>
           <div className="p-4 border-b border-l border-zinc-600 bg-[#0f1621] text-slate-200">
             <h2 className="text-lg font-semibold">
-              {
-                chats.find((c) => c.id === selectedChat)?.participants.find(
-                  (p) => p.userId !== session.user.id
-                )?.user.fullName || 'Chat'
-              }
+              {chats.find((c) => c.id === selectedChat)?.participants.find(
+                (p) => p.userId !== session.user.id
+              )?.user.fullName || 'Chat'}
             </h2>
           </div>
           <div className="flex-1 border-l border-zinc-600 overflow-y-auto p-4 bg-[#0f1621]">
             {messages
               .filter((msg) => msg.chatId === selectedChat)
               .map((msg) => (
-                <div
+                <MessageItem
                   key={msg.id}
-                  className={`mb-2 ${msg.senderId === session.user.id ? '' : 'text-right'}`}
-                >
-                  <div
-                    className={`inline-block p-2 rounded-lg max-w-md ${
-                      msg.senderId === session.user.id
-                        ? 'bg-white border text-slate-950'
-                        : 'bg-blue-500 text-slate-200'
-                    }`}
-                  >
-                    {msg.content}
-                  </div>
-                </div>
+                  message={msg}
+                  userId={session.user.id}
+                  onDelete={handleDeleteMessage}
+                />
               ))}
           </div>
-          {/* Закрепленный инпут */}
           <div className="p-4 border-t border-l border-zinc-600 bg-[#223041]">
             <div className="flex gap-2">
               <Input
                 type="text"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                onKeyDown ={(e) => e.key === 'Enter' && handleSend()}
+                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                 className="flex-1 p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-200"
                 placeholder="Type a message..."
               />
-              <div className='bg-blue-500 rounded-r rounded-l'> 
+              <div className="bg-blue-500 rounded-r rounded-l">
                 <Send
-                onClick={handleSend}
-                className='mt-1 cursor-pointer h-7 w-8'
-              >
-                Send
-              </Send></div>
-             
+                  onClick={handleSend}
+                  className="mt-1 cursor-pointer h-7 w-8"
+                />
+              </div>
             </div>
           </div>
         </>
