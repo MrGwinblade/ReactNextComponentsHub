@@ -40,7 +40,7 @@ export const ChatMessages: React.FC = () => {
   const handleDeleteMessage = useCallback(
     async (messageId: number) => {
       if (session?.user?.id) {
-        debugger
+        
         await DeleteMessage(messageId, session.user.id);
         setIsOpen(false);
         setSelectedMessageId(null);

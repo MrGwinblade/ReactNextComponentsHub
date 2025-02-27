@@ -2,7 +2,6 @@ import { type AuthOptions, type DefaultUser, getServerSession } from "next-auth"
 import GitHubProvider from "next-auth/providers/github"
 import CredentialsProvider from "next-auth/providers/credentials"
 import GoogleProvider from "next-auth/providers/google"
-
 import { prisma } from "@@/prisma/prisma-client"
 import { compare, hashSync } from "bcryptjs"
 import type { UserRole } from "@prisma/client"
@@ -21,7 +20,7 @@ declare module "next-auth" {
       githubLogin?: string | null
     }
   }
-
+  
   interface User extends DefaultUser {
     id: number
     email: string
@@ -106,7 +105,6 @@ export const authOptions: AuthOptions = {
   },
   callbacks: {
     async signIn({ user, account, profile }) {
-      debugger
       try {
         if (account?.provider === "credentials") {
           return true
@@ -132,9 +130,7 @@ export const authOptions: AuthOptions = {
               })
 
               if (existingGitHubUser) {
-                // Return false without redirecting TODO
                 return false
-                
               }
             }
 
@@ -195,54 +191,52 @@ export const authOptions: AuthOptions = {
       }
     },
     async jwt({ token, user }) {
+      // Если есть user (первый вход), устанавливаем начальные данные
       if (user) {
-        token.id = Number(user.id)
-        token.role = user.role
-        token.githubId = user.githubId
-        token.githubLogin = user.githubLogin
-        token.email = user.email
+        token.id = Number(user.id);
+        token.role = user.role;
+        token.githubId = user.githubId;
+        token.githubLogin = user.githubLogin;
+        token.email = user.email;
+        token.fullName = user.name ?? "";
       }
 
-      if (!token.email) {
-        return token
+      // Всегда обновляем данные из базы, если есть email
+      if (token.email) {
+        const findUser = await prisma.user.findFirst({
+          where: { email: token.email },
+        });
+        if (findUser) {
+          token.id = findUser.id;
+          token.email = findUser.email;
+          token.fullName = findUser.fullName;
+          token.role = findUser.role;
+          token.phoneNumber = findUser.phoneNumber ?? undefined;
+          token.githubId = findUser.githubId ?? undefined;
+          token.githubLogin = findUser.githubLogin ?? undefined;
+        }
       }
 
-      const findUser = await prisma.user.findFirst({
-        where: {
-          email: token.email,
-        },
-      })
-
-      if (findUser) {
-        token.id = findUser.id
-        token.email = findUser.email
-        token.fullName = findUser.fullName
-        token.role = findUser.role
-        token.phoneNumber = findUser.phoneNumber ?? ""
-        token.githubId = findUser.githubId
-        token.githubLogin = findUser.githubLogin
-      }
-
-      return token
+      return token;
     },
-    session({ session, token }) {
-      if (session?.user) {
-        session.user.id = token.id
-        session.user.role = token.role
-        session.user.phoneNumber = token.phoneNumber
-        session.user.fullName = token.fullName
-        session.user.githubId = token.githubId
-        session.user.githubLogin = token.githubLogin
+    async session({ session, token }) {
+      if (session?.user && token) {
+        session.user.id = token.id;
+        session.user.role = token.role;
+        session.user.phoneNumber = token.phoneNumber;
+        session.user.fullName = token.fullName;
+        session.user.githubId = token.githubId;
+        session.user.githubLogin = token.githubLogin;
+        session.user.email = token.email;
+        session.user.image = token.picture ?? ""; // Добавляем image из токена, если есть
       }
-
-      return session
-    }
+      return session;
+    },
   },
   events: {
     async signIn({ user, account, profile, isNewUser }) {
-      // You can add custom logic here if needed
+      // Custom logic if needed
     },
   },
   debug: process.env.NODE_ENV === "development",
-}
-
+};

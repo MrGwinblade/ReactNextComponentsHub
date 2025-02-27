@@ -39,7 +39,7 @@ export const ProfilePage: React.FC<Props> = ({ className }) => {
 
   const menuItems = [
     { id: "profile", label: "My Profile", icon: User, path: "/profile" },
-    { id: "messages", label: "Messages", icon: MessageCircle, path: "/chat", },
+    { id: "messages", label: "Messages", icon: MessageCircle, path: "/chat2", },
     { id: "settings", label: "Settings", icon: Settings, path: "/settings" },
   ]
 
