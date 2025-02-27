@@ -1,204 +1,248 @@
-import { AuthOptions, DefaultUser } from 'next-auth';
-import GitHubProvider from 'next-auth/providers/github';
-import CredentialsProvider from 'next-auth/providers/credentials';
-import GoogleProvider from 'next-auth/providers/google';
+import { type AuthOptions, type DefaultUser, getServerSession } from "next-auth"
+import GitHubProvider from "next-auth/providers/github"
+import CredentialsProvider from "next-auth/providers/credentials"
+import GoogleProvider from "next-auth/providers/google"
 
-import { prisma } from '@@/prisma/prisma-client';
-import { compare, hashSync } from 'bcryptjs';
-import { UserRole } from '@prisma/client';
-import { DefaultJWT } from 'next-auth/jwt';
+import { prisma } from "@@/prisma/prisma-client"
+import { compare, hashSync } from "bcryptjs"
+import type { UserRole } from "@prisma/client"
+import type { DefaultJWT } from "next-auth/jwt"
 
-//зачем это тут? да просто defaultUser и jwt nextAuth не содержит всех нужных полей.
-// не забудь секретный ключ в .env
-
-declare module 'next-auth' {
-    interface Session {
-        user: {
-          id: number;
-          role: UserRole;
-          email: string;
-          image: string;
-          phoneNumber: string;
-          fullName: string;
-        };
-      }
-    
-      interface User extends DefaultUser {
-        id: number;
-        role?: UserRole;
-        phoneNumber?: string;
-        fullName?: string;
-      }
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: number
+      role?: UserRole
+      email: string
+      image?: string
+      phoneNumber?: string
+      fullName?: string
+      githubId?: string | null
+      githubLogin?: string | null
     }
-    
-    declare module 'next-auth/jwt' {
-      interface JWT extends DefaultJWT {
-        id: number;
-        role: UserRole;
-        email: string;
-        fullName: string;
-        phoneNumber: string;
-      }
+  }
+
+  interface User extends DefaultUser {
+    id: number
+    email: string
+    role?: UserRole
+    phoneNumber?: string
+    fullName?: string
+    githubId?: string | null
+    githubLogin?: string | null
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT extends DefaultJWT {
+    id: number
+    role?: UserRole
+    email: string
+    fullName?: string
+    phoneNumber?: string
+    githubId?: string | null
+    githubLogin?: string | null
+  }
 }
 
 export const authOptions: AuthOptions = {
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      clientId: process.env.GOOGLE_CLIENT_ID || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     }),
     GitHubProvider({
-      clientId: process.env.GITHUB_ID || '',
-      clientSecret: process.env.GITHUB_SECRET || '',
+      clientId: process.env.GITHUB_ID || "",
+      clientSecret: process.env.GITHUB_SECRET || "",
       profile(profile) {
         return {
           id: profile.id,
-          name: profile.name || profile.login,
+          login: profile.login,
           email: profile.email,
           image: profile.avatar_url,
-          role: 'USER' as UserRole,
-        };
+          role: "USER" as UserRole,
+          githubId: profile.id.toString(),
+          githubLogin: profile.login,
+        }
       },
     }),
     CredentialsProvider({
-      name: 'Credentials',
+      name: "Credentials",
       credentials: {
-        email: { label: 'Email', type: 'text' },
-        password: { label: 'Password', type: 'password' },
+        email: { label: "Email", type: "text" },
+        password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-
         if (!credentials) {
-
-          return null;
+          return null
         }
 
-        const values = {
-          email: credentials.email,
-        };
+        const user = await prisma.user.findFirst({
+          where: { email: credentials.email },
+        })
 
-        const findUser = await prisma.user.findFirst({
-          where: values,
-        });
-
-
-        if (!findUser) {
-          return null;
+        if (!user) {
+          return null
         }
 
-        const isPasswordValid = await compare(credentials.password, findUser.password);
-
+        const isPasswordValid = await compare(credentials.password, user.password)
 
         if (!isPasswordValid) {
-          return null;
+          return null
         }
 
-        //без верификации
-
-        // if (!findUser.verified) {
-            
-        //   return null;
-        // }
-
         return {
-          id: findUser.id,
-          email: findUser.email,
-          name: findUser.fullName,
-          role: findUser.role,
-        };
+          id: user.id,
+          email: user.email,
+          name: user.fullName,
+          role: user.role,
+        }
       },
     }),
   ],
   secret: process.env.NEXTAUTH_SECRET,
   session: {
-    strategy: 'jwt',
+    strategy: "jwt",
   },
   callbacks: {
-    async signIn({ user, account }) {
-
+    async signIn({ user, account, profile }) {
+      debugger
       try {
-        if (account?.provider === 'credentials') {
-
-          return true;
+        if (account?.provider === "credentials") {
+          return true
         }
 
         if (!user.email) {
-          return false;
+          return false
+        }
+
+        const session = await getServerSession(authOptions)
+        if (session?.user?.email) {
+          const currentUser = await prisma.user.findFirst({
+            where: { email: session.user.email },
+          })
+
+          if (currentUser) {
+            if (account?.provider === "github") {
+              const existingGitHubUser = await prisma.user.findFirst({
+                where: {
+                  OR: [{ githubId: user.githubId }, { githubLogin: user.githubLogin }],
+                  NOT: { id: currentUser.id },
+                },
+              })
+
+              if (existingGitHubUser) {
+                // Return false without redirecting TODO
+                return false
+                
+              }
+            }
+
+            await prisma.user.update({
+              where: { id: currentUser.id },
+              data: {
+                githubId: account?.provider === "github" ? user.githubId : currentUser.githubId,
+                githubLogin: account?.provider === "github" ? user.githubLogin : currentUser.githubLogin,
+              },
+            })
+            return true
+          }
         }
 
         const findUser = await prisma.user.findFirst({
           where: {
             OR: [
               { provider: account?.provider, providerId: account?.providerAccountId },
-              { email: user.email }
+              { email: user.email },
+              account?.provider === "github"
+                ? { OR: [{ githubId: user.githubId }, { githubLogin: user.githubLogin }] }
+                : {},
             ],
           },
-        });
-
+        })
 
         if (findUser) {
           await prisma.user.update({
-            where: {
-              id: findUser.id,
-            },
+            where: { id: findUser.id },
             data: {
               provider: account?.provider,
               providerId: account?.providerAccountId,
+              githubId: account?.provider === "github" ? user.githubId : findUser.githubId,
+              githubLogin: account?.provider === "github" ? user.githubLogin : findUser.githubLogin,
             },
-          });
-
-          return true;
+          })
+          return true
         }
 
         await prisma.user.create({
           data: {
             email: user.email,
-            fullName: user.name || 'User #' + user.id,
-            password: hashSync(user.id.toString(), 10),
-            verified: new Date(),
+            password: hashSync(user.id.toString() + "NotaPassword", 10),
+            fullName: user.name || "User #" + user.id,
             provider: account?.provider,
             providerId: account?.providerAccountId,
+            githubId: account?.provider === "github" ? user.githubId : null,
+            githubLogin: account?.provider === "github" ? user.githubLogin : null,
+            role: "USER" as UserRole,
+            verified: new Date(),
           },
-        });
+        })
 
-        return true;
+        return true
       } catch (error) {
-        console.error('Error [SIGNIN]', error);
-        return false;
+        console.error("Error [SIGNIN]", error)
+        return false
       }
     },
-    async jwt({ token }) {
-        console.log(token)
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = Number(user.id)
+        token.role = user.role
+        token.githubId = user.githubId
+        token.githubLogin = user.githubLogin
+        token.email = user.email
+      }
+
       if (!token.email) {
-        return token;
+        return token
       }
 
       const findUser = await prisma.user.findFirst({
         where: {
           email: token.email,
         },
-      });
+      })
 
       if (findUser) {
-        token.id = (findUser.id);
-        token.email = findUser.email;
-        token.fullName = findUser.fullName;
-        token.role = findUser.role;
-        token.phoneNumber = findUser.phoneNumber ?? '';
-        
+        token.id = findUser.id
+        token.email = findUser.email
+        token.fullName = findUser.fullName
+        token.role = findUser.role
+        token.phoneNumber = findUser.phoneNumber ?? ""
+        token.githubId = findUser.githubId
+        token.githubLogin = findUser.githubLogin
       }
 
-      return token;
+      return token
     },
     session({ session, token }) {
       if (session?.user) {
-        session.user.id = token.id;
-        session.user.role = token.role;
-        session.user.phoneNumber = token.phoneNumber;
-        session.user.fullName = token.fullName;
+        session.user.id = token.id
+        session.user.role = token.role
+        session.user.phoneNumber = token.phoneNumber
+        session.user.fullName = token.fullName
+        session.user.githubId = token.githubId
+        session.user.githubLogin = token.githubLogin
       }
 
-      return session;
+      return session
+    }
+  },
+  events: {
+    async signIn({ user, account, profile, isNewUser }) {
+      // You can add custom logic here if needed
     },
   },
-};
+  debug: process.env.NODE_ENV === "development",
+}
+

@@ -39,7 +39,7 @@ export const ProfilePage: React.FC<Props> = ({ className }) => {
 
   const menuItems = [
     { id: "profile", label: "My Profile", icon: User, path: "/profile" },
-    { id: "messages", label: "Messages", icon: MessageCircle, path: "/chat", badge: 3 },
+    { id: "messages", label: "Messages", icon: MessageCircle, path: "/chat", },
     { id: "settings", label: "Settings", icon: Settings, path: "/settings" },
   ]
 
@@ -74,13 +74,7 @@ export const ProfilePage: React.FC<Props> = ({ className }) => {
                 <item.icon className="h-5 w-5" />
                 {item.label}
               </div>
-              {item.badge ? (
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-cyan-200 text-sm text-sky-600">
-                  {item.badge}
-                </span>
-              ) : (
                 <ChevronLeft className="h-5 w-5 rotate-180" />
-              )}
             </Button>
           ))}
         </nav>

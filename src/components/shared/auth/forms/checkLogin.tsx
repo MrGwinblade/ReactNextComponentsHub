@@ -27,7 +27,8 @@ export const CheckLogin: React.FC<Props> = ({ className }) => {
           <p>email: {session.user.email}</p>
           <p>ФИО: {session.user.fullName}</p>
           <p>Телефон: {session.user.phoneNumber}</p>
-
+          <p>GitHub: {session.user.githubId}</p>
+          <p>GitHub: {session.user.githubLogin}</p>
         </div>
       ) : (
         <p>Вы не авторизованы</p>

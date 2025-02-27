@@ -16,6 +16,7 @@ import { CheckLogin } from "./auth/forms/checkLogin"
 import { FullGalleryTemplate } from "./fullGalleryTemplate/full-gallery-template"
 import { ProfilePage } from "./profilePage/profile-page"
 import { ProfileButton } from "./profilePage/profile-button"
+import { Test } from "./test"
 
 
 
@@ -75,6 +76,8 @@ export const ComponentDisplay: React.FC<Props> = ({ className, selectedComponent
         return <FullGalleryTemplate />
       case "profileButton":
         return <ProfileButton />
+      case "test":
+        return <Test />
       default:
         return <div>Select a component from the sidebar to view it.</div>
     }

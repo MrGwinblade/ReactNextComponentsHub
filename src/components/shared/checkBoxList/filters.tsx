@@ -48,7 +48,7 @@ React.useEffect(() => {
 
       <CheckboxFiltersGroup
         title="Title"
-        name="pizzaTypes"
+        name="CheckBoxTypes"
         className="mb-5"
         onClickCheckbox={filters.toggleCheckBoxItem}
         selected={filters.checkBoxItems}

@@ -28,11 +28,11 @@ export const RegisterForm: React.FC<Props> = ({ onClose, onClickLogin }) => {
 
   const onSubmit = async (data: TFormRegisterValues) => {
     try {
-      await registerUser({
-        email: data.email,
-        fullName: data.fullName,
-        password: data.password,
-      });
+      await registerUser(
+        data.email,
+        data.password,
+        data.fullName,
+      );
 
       toast.error('Регистрация успешна 📝. Подтвердите свою почту', {
         icon: '✅',

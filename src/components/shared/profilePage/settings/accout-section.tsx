@@ -6,6 +6,7 @@ import { Dialog } from "@/components/ui/dialog"
 import { SettingsButton } from "./settings-button"
 import { Button } from "@/components/ui"
 import { ChevronRight, ExternalLink } from "lucide-react"
+import { GitHubButton } from "../github-button"
 
 export function AccountSection() {
   const { data: session, update } = useSession()
@@ -74,15 +75,7 @@ export function AccountSection() {
               Connect
             </Button>
           </Button>
-          <Button variant="ghost" className="w-full justify-between px-0 py-4 font-normal hover:bg-gray-100">
-            <div className="flex items-center gap-2">
-              <span className="pl-2">GitHub</span>
-              <ExternalLink className="h-4 w-4" />
-            </div>
-            <Button variant="outline" size="sm">
-              Connect
-            </Button>
-          </Button>
+          <GitHubButton />
         </div>
       </div>
 

@@ -14,23 +14,30 @@ datasource db {
 }
 
 model User {
-    id Int @id @default(autoincrement())
+  id             Int       @id @default(autoincrement())
+  fullName       String
+  email          String    @unique
+  phoneNumber    String?   @unique
+  password       String
+  role           UserRole  @default(USER)
+  verified       DateTime?
+  avatarUrl      String?
 
-    fullName String
-    email    String    @unique
-    phoneNumber String? @unique
-    password String
-    role     UserRole  @default(USER)
-    verified DateTime?
+  provider       String?
+  providerId     String?
 
-    provider   String?
-    providerId String?
+  githubId       String?   @unique
+  githubLogin    String?   @unique
 
-    verificationCode VerificationCode?
+  verificationCode VerificationCode?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  // Новые связи для чатов
+  messages       Message[]
+  chats          UserChat[]
 }
+
 
 model VerificationCode {
     id Int @id @default(autoincrement())
@@ -49,4 +56,65 @@ model VerificationCode {
 enum UserRole {
     USER
     ADMIN
+}
+
+model Chat {
+  id          Int       @id @default(autoincrement())
+  name        String?   // Название чата (для групповых)
+  type        ChatType  @default(DIRECT) // Тип чата (личный или групповой)
+  createdAt   DateTime  @default(now())
+
+  messages    Message[]
+  participants UserChat[]
+}
+
+model Message {
+  id          Int       @id @default(autoincrement())
+  chatId      Int
+  senderId    Int
+  content     String    // Текст сообщения
+  createdAt   DateTime  @default(now())
+
+  chat        Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender      User      @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  status      MessageStatus @default(SENT)
+  attachments Attachment[]
+
+  replyToId   Int?
+  replyTo     Message?  @relation("Replies", fields: [replyToId], references: [id])
+  replies     Message[] @relation("Replies")
+}
+
+model UserChat {
+  userId   Int
+  chatId   Int
+  joinedAt DateTime @default(now())
+
+  user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chat     Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@id([userId, chatId]) // Композитный первичный ключ
+
+  lastViewedAt DateTime? //отображения непрочитанных сообщений, сравнивать с createdAt Message
+}
+
+enum ChatType {
+  DIRECT   // Личный чат (1 на 1)
+  GROUP    // Групповой чат
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
+model Attachment {
+  id          Int       @id @default(autoincrement())
+  messageId   Int
+  url         String    // Ссылка на файл в хранилище (S3, например)
+  type        String    // "image", "pdf", etc.
+  createdAt   DateTime  @default(now())
+
+  message     Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
 }

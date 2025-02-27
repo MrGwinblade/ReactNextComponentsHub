@@ -24,6 +24,7 @@ export const Sidebar: React.FC<Props> = ({ className, onComponentSelect, selecte
     { name: "CheckLogin", path: "checkLogin" },
     { name: "Full Gallery Template", path: "fullGalleryTemplate" },
     { name: "Profile", path: "profileButton" },
+    { name: "test", path: "test"},
 
     // Add more components here
   ]

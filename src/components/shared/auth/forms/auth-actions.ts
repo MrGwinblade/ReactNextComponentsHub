@@ -1,10 +1,11 @@
 'use server';
 
 import { prisma } from '@@/prisma/prisma-client';
-import { Prisma } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { hashSync } from 'bcryptjs';
 
-export async function registerUser(body: Prisma.UserCreateInput) {
+{/*
+  export async function registerUser(body: Prisma.UserCreateInput) {
     try {
       const user = await prisma.user.findFirst({
         where: {
@@ -45,6 +46,33 @@ export async function registerUser(body: Prisma.UserCreateInput) {
     //     }) as React.ReactNode,
     //   );
     } catch (err) {
+      console.log('Error [CREATE_USER]', err);
+      throw err;
+    }
+  }
+*/}
+
+  export async function registerUser(email: string, password: string, fullName: string) {
+    try{
+      const existingUser = await prisma.user.findFirst({ where: { email } });
+      if (existingUser) {
+        throw new Error("User with this email already exists");
+      }
+    
+      const hashedPassword = await hashSync(password, 10);
+      await prisma.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          fullName,
+          role: "USER" as UserRole,
+          verified: new Date(),
+        },
+      });
+  
+      return true;
+    }
+    catch (err) {
       console.log('Error [CREATE_USER]', err);
       throw err;
     }

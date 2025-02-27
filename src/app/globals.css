@@ -90,6 +90,13 @@ html {
   background: #dbdadd;
 }
 
+* {
+  scrollbar-width: thin; /* Делаем тонкий скролл */
+  scrollbar-color: #6d6d6d #f1f1f11c; /* Ползунок (#888) и трек (#f1f1f1) */
+}
+
+
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
@@ -181,5 +188,16 @@ ol li {
     &:hover {
       color: #2159d1;
     }
+  }
+}
+
+
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
   }
 }

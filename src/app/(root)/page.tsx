@@ -28,10 +28,6 @@ export default function Home() {
   )
   return (
     <div>
-       {/* <Container className="mt-10 flex">
-       <Sidebar className="w-[20%] p-4" />
-       <ComponentDisplay className="p-4 flex-1 items-center text-center" />
-       </Container> */}
       <Container className="relative flex h-screen bg-[#f6f9fc]">
       <Sidebar className="w-[20%] p-4 min-w-[150px] bg-[#f6f9fc]" onComponentSelect={onComponentSelect} selectedComponent={component} />
       <ComponentDisplay className="p-4 flex-1 items-center text-center bg-white my-[20px] rounded-lg shadow-lg" selectedComponent={component} DynamicIconGrid={DynamicIconGrid}/>
